@@ -1,1 +1,234 @@
-# cyberpunk22
+# cyberpunk22<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cyberpunk 2D Adventure</title>
+<style>
+  /* RESET */
+  * {margin:0;padding:0;box-sizing:border-box;}
+  body {background:#0a0a0a;color:#fff;font-family:'Courier New', monospace;overflow:hidden;}
+  
+  /* CANVAS */
+  canvas {display:block;background:#111;}
+  
+  /* HUD */
+  #hud {
+    position:absolute;top:10px;left:10px;
+    font-family:'Courier New', monospace;
+    font-size:16px;color:#ff00ff;
+    z-index:10;
+  }
+  
+  /* MENÚ INICIAL */
+  #menu {
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    background:#000c;display:flex;justify-content:center;align-items:center;flex-direction:column;
+    color:#0ff;font-size:32px;font-family:'Courier New', monospace;
+    z-index:20;
+  }
+  #menu button {
+    margin-top:20px;padding:10px 20px;font-size:24px;
+    background:#222;color:#0ff;border:2px solid #0ff;cursor:pointer;
+  }
+  #menu button:hover {background:#0ff;color:#222;}
+  
+  /* DIALOGOS */
+  #dialogo {
+    position:absolute;bottom:50px;left:50%;transform:translateX(-50%);
+    background:#000c;padding:10px 20px;border:1px solid #0ff;
+    font-family:'Courier New', monospace;color:#0ff;font-size:18px;
+    max-width:80%;text-align:center;display:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <div>Cyberpunk 2D Adventure</div>
+  <button onclick="startGame()">Iniciar Juego</button>
+</div>
+<div id="hud">Vidas: 3 | Puntos: 0 | Nivel: 1</div>
+<div id="dialogo"></div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<script>
+// =================== SETUP ===================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let gameRunning = false;
+let keys = {};
+let player, enemies, bullets, level = 1, score = 0, lives = 3;
+let dialogs = [
+  {text:"Bienvenido al mundo digital...", voice:"Hola, soy tu mentor, prepárate para la aventura!"},
+  {text:"Debes restaurar el equilibrio entre tecnología y vida real.", voice:"Usa tus habilidades de hacking y combate!"}
+];
+
+// =================== PLAYER ===================
+player = {
+  x:400, y:500, width:40, height:60, speed:5, color:'#0ff',
+  dx:0, dy:0, jumping:false, gravity:0.5, jumpPower:-10
+};
+
+// =================== ENEMIES ===================
+function spawnEnemies() {
+  enemies = [];
+  for(let i=0;i<level+2;i++){
+    enemies.push({
+      x:Math.random()*700, y:Math.random()*400,
+      width:40, height:40, color:'#f0f',
+      dx:Math.random()*2-1, dy:Math.random()*2-1
+    });
+  }
+}
+
+// =================== BULLETS ===================
+bullets = [];
+
+// =================== CONTROLES ===================
+document.addEventListener('keydown', e=>keys[e.key]=true);
+document.addEventListener('keyup', e=>keys[e.key]=false);
+
+// =================== FUNCIONES ===================
+function startGame(){
+  document.getElementById('menu').style.display='none';
+  showDialog(0);
+  gameRunning = true;
+  spawnEnemies();
+  requestAnimationFrame(gameLoop);
+}
+
+function showDialog(index){
+  let d = document.getElementById('dialogo');
+  d.style.display='block';
+  d.innerText = dialogs[index].text;
+  // VOZ GENERADA POR IA SIMULADA CON SpeechSynthesis
+  if('speechSynthesis' in window){
+    let utter = new SpeechSynthesisUtterance(dialogs[index].voice);
+    utter.rate = 1;
+    window.speechSynthesis.speak(utter);
+  }
+  setTimeout(()=>{d.style.display='none';},4000);
+}
+
+function updatePlayer(){
+  player.dx = 0;
+  if(keys['ArrowLeft'] || keys['a']) player.dx = -player.speed;
+  if(keys['ArrowRight'] || keys['d']) player.dx = player.speed;
+  if((keys['ArrowUp'] || keys['w'] || keys[' ']) && !player.jumping){
+    player.dy = player.jumpPower;
+    player.jumping = true;
+  }
+  
+  player.dy += player.gravity;
+  player.x += player.dx;
+  player.y += player.dy;
+  
+  // limites del canvas
+  if(player.y + player.height > canvas.height){
+    player.y = canvas.height - player.height;
+    player.dy = 0;
+    player.jumping = false;
+  }
+  if(player.x < 0) player.x=0;
+  if(player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+}
+
+function updateEnemies(){
+  enemies.forEach(e=>{
+    e.x += e.dx;
+    e.y += e.dy;
+    if(e.x<0 || e.x+e.width>canvas.width) e.dx*=-1;
+    if(e.y<0 || e.y+e.height>canvas.height) e.dy*=-1;
+  });
+}
+
+function updateBullets(){
+  bullets.forEach((b,i)=>{
+    b.y -= b.speed;
+    // colision con enemigos
+    enemies.forEach((e,j)=>{
+      if(b.x<b.x+b.width && b.x+b.width>e.x && b.y<b.y+b.height && b.y+b.height>e.y){
+        enemies.splice(j,1);
+        bullets.splice(i,1);
+        score += 10;
+      }
+    });
+    if(b.y<0) bullets.splice(i,1);
+  });
+}
+
+function fireBullet(){
+  bullets.push({x:player.x+player.width/2-5,y:player.y,width:10,height:20,speed:8,color:'#ff0'});
+}
+
+// =================== LOOP ===================
+function gameLoop(){
+  if(!gameRunning) return;
+  
+  // fondo cyberpunk con neones y lluvia
+  ctx.fillStyle='#111';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  
+  // lluvia simple
+  for(let i=0;i<50;i++){
+    ctx.strokeStyle='rgba(0,255,255,0.2)';
+    ctx.beginPath();
+    ctx.moveTo(Math.random()*canvas.width,Math.random()*canvas.height);
+    ctx.lineTo(Math.random()*canvas.width,Math.random()*canvas.height+10);
+    ctx.stroke();
+  }
+  
+  // update
+  updatePlayer();
+  updateEnemies();
+  updateBullets();
+  
+  // draw player
+  ctx.fillStyle=player.color;
+  ctx.fillRect(player.x,player.y,player.width,player.height);
+  
+  // draw enemies
+  enemies.forEach(e=>{
+    ctx.fillStyle=e.color;
+    ctx.fillRect(e.x,e.y,e.width,e.height);
+  });
+  
+  // draw bullets
+  bullets.forEach(b=>{
+    ctx.fillStyle=b.color;
+    ctx.fillRect(b.x,b.y,b.width,b.height);
+  });
+  
+  // HUD
+  document.getElementById('hud').innerText = `Vidas: ${lives} | Puntos: ${score} | Nivel: ${level}`;
+  
+  // colisiones con jugador
+  enemies.forEach((e,i)=>{
+    if(player.x<e.x+e.width && player.x+player.width>e.x && player.y<e.y+e.height && player.y+player.height>e.y){
+      enemies.splice(i,1);
+      lives--;
+      if(lives<=0){
+        alert('GAME OVER');
+        location.reload();
+      }
+    }
+  });
+  
+  // pasar nivel
+  if(enemies.length===0){
+    level++;
+    spawnEnemies();
+    showDialog(1);
+  }
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// =================== DISPARO ===================
+document.addEventListener('keydown', e=>{
+  if(e.key==='Enter' || e.key==='Shift') fireBullet();
+});
+</script>
+</body>
+</html>
